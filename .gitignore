@@ -1,0 +1,5 @@
+# all executables
+*.exe
+
+# IDE data
+.vscode/*
