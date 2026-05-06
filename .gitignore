@@ -1,5 +1,33 @@
-# all executables
-*.exe
+# Build artifacts
+build/
+cmake-build-*/
 
-# IDE data
-.vscode/*
+# Executables
+*.exe
+*.out
+
+# Object files
+*.o
+*.obj
+
+# IDE / editor
+.vscode/
+*.vs/
+*.sln
+*.vcxproj*
+.idea/
+CMakeUserPresets.json
+
+# CMake generated
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Compressed test artifacts
+*.huff
+*.decoded.txt
