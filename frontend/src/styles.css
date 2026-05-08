@@ -1,0 +1,7 @@
+body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial; margin: 16px; color: #111; }
+.app-container { max-width: 900px; margin: 0 auto; }
+.editor-wrap textarea { width: 100%; font-family: inherit; font-size: 14px; }
+.editor-buttons { margin-top: 8px; display:flex; gap:8px; }
+.results { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+.freq-wrap, .tree-wrap { border: 1px solid #ddd; padding: 12px; border-radius: 6px; background: #fafafa; }
+.file-controls { margin-top: 8px; }
