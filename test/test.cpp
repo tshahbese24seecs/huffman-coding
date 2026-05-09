@@ -256,6 +256,7 @@ void test_string_roundtrips()
         string(1, 'Z'),
         "  spaces  everywhere  ",
         "Line1\nLine2\nLine3",
+        string("A\0B\0C", 5),
     };
 
     for (size_t i = 0; i < test_cases.size(); i++)

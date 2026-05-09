@@ -10,6 +10,11 @@
 
 using namespace std;
 
+static bool is_leaf(Node *node)
+{
+    return node && node->left == nullptr && node->right == nullptr;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //  Frequency analysis
 // ═══════════════════════════════════════════════════════════════════
@@ -65,10 +70,11 @@ void print_tree(Node *root, const string &indent)
     if (root == nullptr)
         return;
 
-    if (root->value != '\0')
+    if (is_leaf(root))
     {
         cout << indent << "+-- '";
         if (root->value == ' ')       cout << "SPACE";
+        else if (root->value == '\0') cout << "\\0";
         else if (root->value == '\n') cout << "\\n";
         else if (root->value == '\t') cout << "\\t";
         else if (root->value == '\r') cout << "\\r";
@@ -106,7 +112,8 @@ static string escape_json_char(char ch)
         case '\b': return "\\b";
         case '\f': return "\\f";
         default:
-            if (static_cast<unsigned char>(ch) < 0x20)
+            if (static_cast<unsigned char>(ch) < 0x20 ||
+                static_cast<unsigned char>(ch) >= 0x7F)
             {
                 char buf[8];
                 snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned char>(ch));
@@ -124,7 +131,7 @@ string tree_to_json(Node *root)
     string json = "{";
 
     // value
-    if (root->value != '\0')
+    if (is_leaf(root))
         json += "\"value\":\"" + escape_json_char(root->value) + "\",";
     else
         json += "\"value\":null,";
@@ -162,7 +169,7 @@ void generate_prefix_codes(Node *root, const string &curr_code,
     if (!root)
         return;
 
-    if (root->value != '\0')
+    if (is_leaf(root))
     {
         prefix[root->value] = curr_code.empty() ? "0" : curr_code;
         return;
@@ -185,7 +192,7 @@ void serialize_tree(Node *root, string &result)
     if (!root)
         return;
 
-    if (root->value != '\0')
+    if (is_leaf(root))
     {
         result += '1';
         result += root->value;
@@ -230,19 +237,18 @@ string base64_encode(const vector<unsigned char> &data)
     string out;
     out.reserve(((data.size() + 2) / 3) * 4);
 
-    size_t i = 0;
-    while (i < data.size())
+    for (size_t i = 0; i < data.size(); i += 3)
     {
-        uint32_t octet_a = i < data.size() ? data[i++] : 0;
-        uint32_t octet_b = i < data.size() ? data[i++] : 0;
-        uint32_t octet_c = i < data.size() ? data[i++] : 0;
+        uint32_t octet_a = data[i];
+        uint32_t octet_b = (i + 1 < data.size()) ? data[i + 1] : 0;
+        uint32_t octet_c = (i + 2 < data.size()) ? data[i + 2] : 0;
 
         uint32_t triple = (octet_a << 16) | (octet_b << 8) | octet_c;
 
         out += B64_TABLE[(triple >> 18) & 0x3F];
         out += B64_TABLE[(triple >> 12) & 0x3F];
-        out += (i > data.size() + 1) ? '=' : B64_TABLE[(triple >> 6) & 0x3F];
-        out += (i > data.size())     ? '=' : B64_TABLE[triple & 0x3F];
+        out += (i + 1 < data.size()) ? B64_TABLE[(triple >> 6) & 0x3F] : '=';
+        out += (i + 2 < data.size()) ? B64_TABLE[triple & 0x3F] : '=';
     }
     return out;
 }
@@ -572,7 +578,7 @@ DecompressionResult decompress(const vector<unsigned char> &data)
 
         current = (bit == 0) ? current->left : current->right;
 
-        if (current && current->value != '\0')
+        if (is_leaf(current))
         {
             decoded += current->value;
             current = root;

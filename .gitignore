@@ -12,6 +12,8 @@ cmake-build-*/
 
 # IDE / editor
 .vscode/
+!.vscode/
+!.vscode/c_cpp_properties.json
 *.vs/
 *.sln
 *.vcxproj*

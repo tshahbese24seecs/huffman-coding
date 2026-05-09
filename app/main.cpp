@@ -5,9 +5,8 @@
  * Endpoints:
  *   GET  /api/health        — Health check
  *   POST /api/analyze       — Analyze text (frequencies, codes, tree) without compressing
- *   POST /api/compress      — Compress text, return base64 payload + metadata
- *   POST /api/decompress    — Decompress base64 payload, return original text
- *   POST /api/compress-file — Compress an uploaded file (multipart form)
+ *   POST /api/compress      — Compress text or base64 file bytes
+ *   POST /api/decompress    — Decompress base64 payload, return restored bytes
  *
  * Dependencies:
  *   - cpp-httplib (single-header HTTP server, fetched via CMake)
@@ -34,14 +33,60 @@ using namespace std;
  */
 static string char_label(char ch)
 {
+    unsigned char byte = static_cast<unsigned char>(ch);
     switch (ch)
     {
         case ' ':  return "SPACE";
         case '\n': return "\\n";
         case '\r': return "\\r";
         case '\t': return "\\t";
-        default:   return string(1, ch);
+        default:
+            if (byte >= 0x21 && byte <= 0x7E)
+                return string(1, ch);
+
+            char buf[5];
+            snprintf(buf, sizeof(buf), "0x%02X", byte);
+            return string(buf);
     }
+}
+
+static vector<unsigned char> string_to_bytes(const string &data)
+{
+    return vector<unsigned char>(data.begin(), data.end());
+}
+
+static string bytes_to_string(const vector<unsigned char> &data)
+{
+    return string(data.begin(), data.end());
+}
+
+static bool is_valid_utf8(const string &s)
+{
+    size_t i = 0;
+    while (i < s.size())
+    {
+        unsigned char c = static_cast<unsigned char>(s[i]);
+        size_t remaining = 0;
+
+        if (c <= 0x7F) remaining = 0;
+        else if ((c & 0xE0) == 0xC0) remaining = 1;
+        else if ((c & 0xF0) == 0xE0) remaining = 2;
+        else if ((c & 0xF8) == 0xF0) remaining = 3;
+        else return false;
+
+        if (i + remaining >= s.size())
+            return false;
+
+        for (size_t j = 1; j <= remaining; j++)
+        {
+            unsigned char cc = static_cast<unsigned char>(s[i + j]);
+            if ((cc & 0xC0) != 0x80)
+                return false;
+        }
+
+        i += remaining + 1;
+    }
+    return true;
 }
 
 /**
@@ -141,14 +186,20 @@ void handle_compress(const httplib::Request &req, httplib::Response &res)
     json body;
     if (!parse_json_body(req, res, body)) return;
 
-    if (!body.contains("text") || !body["text"].is_string())
+    if ((!body.contains("text") || !body["text"].is_string()) &&
+        (!body.contains("data_b64") || !body["data_b64"].is_string()))
     {
-        send_error(res, 400, "Missing required field: \"text\" (string).");
+        send_error(res, 400, "Missing required field: \"text\" or \"data_b64\" (string).");
         return;
     }
 
-    string text = body["text"].get<string>();
-    auto result = compress(text);
+    string input;
+    if (body.contains("data_b64"))
+        input = bytes_to_string(base64_decode(body["data_b64"].get<string>()));
+    else
+        input = body["text"].get<string>();
+
+    auto result = compress(input);
 
     if (!result.success)
     {
@@ -179,6 +230,10 @@ void handle_compress(const httplib::Request &req, httplib::Response &res)
         {"codes",             codes_obj},
         {"tree",              json::parse(result.tree_json)}
     };
+    if (body.contains("filename") && body["filename"].is_string())
+        j["filename"] = body["filename"].get<string>();
+    if (body.contains("mime_type") && body["mime_type"].is_string())
+        j["mime_type"] = body["mime_type"].get<string>();
     res.set_content(j.dump(2), "application/json");
 }
 
@@ -206,11 +261,16 @@ void handle_decompress(const httplib::Request &req, httplib::Response &res)
     }
 
     apply_cors(res);
+    string decoded_b64 = base64_encode(string_to_bytes(result.text));
     json j = {
         {"success",       true},
-        {"text",          result.text},
+        {"data_b64",      decoded_b64},
         {"original_size", result.original_size}
     };
+    if (is_valid_utf8(result.text))
+        j["text"] = result.text;
+    else
+        j["text"] = nullptr;
     if (!result.error.empty())
         j["warning"] = result.error;
 
@@ -260,6 +320,12 @@ int main(int argc, char *argv[])
          << "  ║  Press Ctrl+C to stop.                    ║\n"
          << "  ╚═══════════════════════════════════════════╝\n\n";
 
-    svr.listen("0.0.0.0", port);
+    if (!svr.listen("0.0.0.0", port))
+    {
+        cerr << "Failed to start server on port " << port
+             << ". The port may already be in use.\n";
+        return 1;
+    }
+
     return 0;
 }
