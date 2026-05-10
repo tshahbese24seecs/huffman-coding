@@ -22,6 +22,7 @@
 #include <nlohmann/json.hpp>
 
 #include "../src/huffman.h"
+#include <cstdlib>
 
 using json = nlohmann::json;
 using namespace std;
@@ -284,12 +285,15 @@ void handle_decompress(const httplib::Request &req, httplib::Response &res)
 int main(int argc, char *argv[])
 {
     int port = 8080;
-
-    // Allow overriding the port via CLI or env
     if (argc > 1)
         port = atoi(argv[1]);
+    else if (const char *env_port = getenv("PORT"))
+        port = atoi(env_port);
 
     httplib::Server svr;
+
+        // ── Serve frontend static files ──────────────────────────
+        svr.set_mount_point("/", "./frontend/dist");
 
     // ── CORS preflight handler (catch-all for OPTIONS) ──────────
     svr.Options("/(.*)", [](const httplib::Request &, httplib::Response &res)
