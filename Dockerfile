@@ -6,7 +6,7 @@ RUN cmake -B build -S . -DCMAKE_BUILD_TYPE=Release \
  && cmake --build build --target huffman_server --config Release -j$(nproc)
 
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y libstdc++6 libbrotli1 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y libstdc++6 libbrotli1 libssl3 && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /app/build/huffman_server ./huffman_server
 COPY --from=builder /app/frontend/dist ./frontend/dist
